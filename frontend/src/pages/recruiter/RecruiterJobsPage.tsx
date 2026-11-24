@@ -183,21 +183,21 @@ export const RecruiterJobsPage: React.FC = () => {
       description: '',
       employment_type: 'full_time',
       work_mode: 'on_site',
-      location: profile.company?.location || '',
-      salary_range: '',
-      ctc_lpa: 0,
-      min_cgpa: 0,
+      location: profile.company?.location || 'Bengaluru, India',
+      salary_range: '10 - 16 LPA',
+      ctc_lpa: 12.0,
+      min_cgpa: 6.0,
       target_graduation_year: new Date().getFullYear(),
       max_active_backlogs: 0,
-      max_total_backlogs: 0,
+      max_total_backlogs: 1,
       application_deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
       status: 'draft',
       required_skills: [],
       preferred_skills: [],
       eligible_department_ids: departments.map(d => d.id),
     });
-    setReqSkillsInput('');
-    setPrefSkillsInput('');
+    setReqSkillsInput('Python, FastAPI, SQL');
+    setPrefSkillsInput('Docker, React, Git');
     setIsJobModalOpen(true);
   };
 
@@ -217,7 +217,7 @@ export const RecruiterJobsPage: React.FC = () => {
       target_graduation_year: job.target_graduation_year || 2026,
       max_active_backlogs: job.max_active_backlogs,
       max_total_backlogs: job.max_total_backlogs,
-      application_deadline: new Date(job.application_deadline).toISOString().slice(0, 16),
+      application_deadline: job.application_deadline ? new Date(job.application_deadline).toISOString().slice(0, 16) : '',
       status: job.status,
       required_skills: job.all_skills?.filter(s => s.is_mandatory).map(s => s.skill_name) || job.skills || [],
       preferred_skills: job.all_skills?.filter(s => !s.is_mandatory).map(s => s.skill_name) || [],
@@ -233,14 +233,50 @@ export const RecruiterJobsPage: React.FC = () => {
     setIsSubmitting(true);
     setStatusMessage(null);
     try {
+      const trimmedTitle = jobForm.title.trim();
+      const trimmedDesc = jobForm.description.trim();
+      const trimmedLoc = jobForm.location.trim();
+
+      if (trimmedTitle.length < 3) {
+        setStatusMessage({ type: 'error', text: 'Job title must be at least 3 characters long.' });
+        setIsSubmitting(false);
+        return;
+      }
+      if (trimmedDesc.length < 10) {
+        setStatusMessage({ type: 'error', text: 'Job description must be at least 10 characters long.' });
+        setIsSubmitting(false);
+        return;
+      }
+      if (trimmedLoc.length < 2) {
+        setStatusMessage({ type: 'error', text: 'Job location must be at least 2 characters long.' });
+        setIsSubmitting(false);
+        return;
+      }
+
+      let deadlineIso: string;
+      try {
+        if (!jobForm.application_deadline) {
+          throw new Error('Application deadline is required.');
+        }
+        deadlineIso = new Date(jobForm.application_deadline).toISOString();
+      } catch {
+        setStatusMessage({ type: 'error', text: 'Please provide a valid application deadline date and time.' });
+        setIsSubmitting(false);
+        return;
+      }
+
       const reqSkills = reqSkillsInput.split(',').map(s => s.trim()).filter(Boolean);
       const prefSkills = prefSkillsInput.split(',').map(s => s.trim()).filter(Boolean);
 
       const payload: JobCreate = {
         ...jobForm,
+        title: trimmedTitle,
+        description: trimmedDesc,
+        location: trimmedLoc,
+        company_id: profile?.company_id,
         required_skills: reqSkills,
         preferred_skills: prefSkills,
-        application_deadline: new Date(jobForm.application_deadline).toISOString(),
+        application_deadline: deadlineIso,
       };
 
       if (selectedJob) {
@@ -254,7 +290,22 @@ export const RecruiterJobsPage: React.FC = () => {
       setIsJobModalOpen(false);
       await loadData();
     } catch (err: any) {
-      const msg = err.response?.data?.detail?.message || 'Failed to save job posting.';
+      const detail = err.response?.data?.detail;
+      const errorObj = err.response?.data?.error;
+      let msg = 'Failed to save job posting.';
+
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (detail?.message) {
+        msg = detail.message;
+      } else if (Array.isArray(detail)) {
+        msg = detail.map((e: any) => `${e.loc ? e.loc.slice(-1) : 'field'}: ${e.msg}`).join('; ');
+      } else if (errorObj?.message) {
+        msg = errorObj.message;
+      } else if (err.message) {
+        msg = err.message;
+      }
+
       setStatusMessage({ type: 'error', text: msg });
     } finally {
       setIsSubmitting(false);

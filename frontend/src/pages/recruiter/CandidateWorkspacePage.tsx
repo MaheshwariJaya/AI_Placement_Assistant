@@ -146,7 +146,21 @@ export const CandidateWorkspacePage: React.FC = () => {
       setOfferModalOpen(false);
     } catch (err: any) {
       console.error('Status transition failed', err);
-      setErrorMsg(err?.response?.data?.detail || 'Status transition failed.');
+      const detail = err?.response?.data?.detail;
+      const errorObj = err?.response?.data?.error;
+      let msg = 'Status transition failed.';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (detail?.message) {
+        msg = detail.message;
+      } else if (Array.isArray(detail)) {
+        msg = detail.map((e: any) => `${e.loc ? e.loc.slice(-1) : 'field'}: ${e.msg}`).join('; ');
+      } else if (errorObj?.message) {
+        msg = errorObj.message;
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setErrorMsg(msg);
     } finally {
       setIsTransitioning(false);
     }
@@ -450,7 +464,13 @@ export const CandidateWorkspacePage: React.FC = () => {
                   variant="primary"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   disabled={isTransitioning}
-                  onClick={() => setOfferModalOpen(true)}
+                  onClick={() => {
+                    if (!offerDeadline) {
+                      const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+                      setOfferDeadline(nextWeek);
+                    }
+                    setOfferModalOpen(true);
+                  }}
                 >
                   Extend Job Offer
                 </Button>

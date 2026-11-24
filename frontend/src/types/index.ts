@@ -359,6 +359,7 @@ export interface Job {
 }
 
 export interface JobCreate {
+  company_id?: number;
   title: string;
   description: string;
   employment_type: EmploymentType;
@@ -381,6 +382,7 @@ export interface JobCreate {
 }
 
 export interface JobUpdate {
+  company_id?: number;
   title?: string;
   description?: string;
   employment_type?: EmploymentType;

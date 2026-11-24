@@ -28,6 +28,7 @@ from app.models.placement import (
     InterviewOutcome,
     InterviewStatus,
     JobApplication,
+    NotificationCategory,
     TpoScreeningStatus,
 )
 from app.models.student import (
@@ -64,6 +65,7 @@ from app.schemas.intelligence import ScoreBreakdown
 from app.services.ai_provider import get_ai_provider
 from app.services.eligibility_service import evaluate_student_job_eligibility
 from app.services.matching_engine import calculate_compatibility_score
+from app.services.notification_service import create_notification
 from app.services.state_machine import execute_recruiter_lifecycle_transition
 
 logger = logging.getLogger(__name__)
@@ -931,6 +933,29 @@ async def execute_candidate_status_transition(
             app.offer_deadline_at = payload.offer_deadline_at
         if payload.offer_notes:
             app.offer_notes = payload.offer_notes
+
+        # Dispatch immediate formal offer notification to student candidate
+        try:
+            student_prof = await session.get(StudentProfile, app.student_id)
+            if student_prof and student_prof.user_id:
+                pkg_val = app.offer_package_lpa or (float(job.ctc_lpa) if job.ctc_lpa is not None else None)
+                pkg_text = f" ({pkg_val:.2f} LPA)" if pkg_val else ""
+                await create_notification(
+                    session=session,
+                    recipient_user_id=student_prof.user_id,
+                    sender_user_id=current_user.id,
+                    category=NotificationCategory.OFFER_EXTENDED,
+                    title=f"Offer Available: {job.title}",
+                    message=(
+                        f"Congratulations! You have received a formal job offer for '{job.title}'{pkg_text}. "
+                        "Review offer details and respond in your Application Tracker."
+                    ),
+                    related_application_id=app.id,
+                    related_drive_id=app.drive_id,
+                    idempotency_key=f"offer-instant-{app.id}-{int(datetime.now(timezone.utc).timestamp())}",
+                )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch instant offer notification: {e}")
 
     app.recruiter_decision_at = datetime.now(timezone.utc)
     app.recruiter_feedback_notes = payload.decision_notes

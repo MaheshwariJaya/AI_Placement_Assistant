@@ -47,6 +47,8 @@ VALID_RECRUITER_TRANSITIONS = {
     },
     ApplicationStatus.UNDER_REVIEW: {
         ApplicationStatus.SHORTLISTED,
+        ApplicationStatus.INTERVIEW_SCHEDULED,
+        ApplicationStatus.OFFERED,
         ApplicationStatus.REJECTED,
         ApplicationStatus.WITHDRAWN,
     },
@@ -59,6 +61,7 @@ VALID_RECRUITER_TRANSITIONS = {
     ApplicationStatus.INTERVIEW_SCHEDULED: {
         ApplicationStatus.INTERVIEWED,
         ApplicationStatus.SHORTLISTED,  # Round cancelled reverting to shortlisted
+        ApplicationStatus.OFFERED,  # Offer extended directly following interview round
         ApplicationStatus.REJECTED,
         ApplicationStatus.WITHDRAWN,
     },
